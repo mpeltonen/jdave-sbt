@@ -1,47 +1,74 @@
-package jdave.sbt
+package org.jdave.sbt
 
-import _root_.sbt._
+import org.scalatools.testing._
 
-object JDaveFramework extends LazyTestFramework {
+class JDaveFramework extends Framework {
   val name = "JDave"
 
-  def testSuperClassName = "jdave.Specification"
-  def testSubClassType = ClassType.Class
-
-  def testRunnerClassName = "jdave.sbt.JDaveRunner"
+  def tests = Array(new JDaveAnnotationFingerPrint)
+  def testRunner(p1: ClassLoader, p2: Array[Logger]) = new JDaveRunner(p1, p2)
 }
 
-class JDaveRunner(val log: Logger, val listeners: Seq[TestReportListener], val testLoader: ClassLoader) extends BasicTestRunner {
-import java.lang.reflect.Method
-import _root_.jdave.{Specification, ExpectationFailedException}
-import _root_.jdave.runner.{ISpecVisitor, Context, Behavior, SpecRunner, IBehaviorResults}
+class JDaveAnnotationFingerPrint extends AnnotatedFingerprint {
+  def isModule = false
+  def annotationName = "org.junit.runner.RunWith"
+}
 
-  def runTest(testClassName: String): Result.Value = {
-    val testClass = Class.forName(testClassName, true, testLoader).asSubclass(classOf[Specification[_]])
-    val specVisitor = new JDaveSpecVisitor
-    new SpecRunner().run(testClass, specVisitor)
-    specVisitor.testResult
+class JDaveRunner(testLoader: ClassLoader, loggers: Array[Logger]) extends Runner2 {
+  import java.lang.reflect.Method
+  import _root_.jdave.{ Specification, ExpectationFailedException }
+  import _root_.jdave.runner.{ ISpecVisitor, Context, Behavior, SpecRunner, IBehaviorResults }
+  val logger = loggers(0)
+  
+  def run(testClassName: String, fingerprint: Fingerprint, eventHandler: EventHandler, args: Array[String]) {
+    runTest(testClassName, eventHandler)
   }
 
-  private class JDaveSpecVisitor extends ISpecVisitor {
-    var testResult = Result.Passed
+  def runTest(testClassName: String, eventHandler: EventHandler): Unit = {
+    val testClass = Class.forName(testClassName, true, testLoader).asSubclass(classOf[Specification[_]])
+    val specVisitor = new JDaveSpecVisitor(testClass.getName, eventHandler)
+    new SpecRunner().run(testClass, specVisitor)
+  }
 
-    def onContext(context: Context) = log.info("  " + context.getName)
+  private def log(name : String, desc : String, result : Result) = {
+    result match {
+       case Result.Success => logger.info("%s passed.\n".format(name))
+       case Result.Failure => logger.info("%s failed:\n %s".format(name, desc))
+       case Result.Error => logger.info("%s exception occurred\n %s".format(name, desc))
+    }
+  }
+  
+  private def asEvent(nr: (String, String, Result, Option[Throwable])) = nr match {
+    case (testname: String, desc:String, r: Result, t : Option[Throwable]) => new Event {
+      log(testname, desc, r)
+      val testName = testname        
+      val description = desc
+      val result = r
+      val error = (r, t) match {
+        case (Result.Error, Some(x)) =>  x
+        case _ => null
+      }
+    }
+  }
 
+  private class JDaveSpecVisitor(testClass:String, eventHandler: EventHandler) extends ISpecVisitor {
+    private def getFullName (method :String) = { "%s.%s".format(testClass, method) }
+    
+    def onContext(context: Context) = {}
+
+    
     def onBehavior(behavior: Behavior) {
       behavior.run(new IBehaviorResults {
-        def expected(method: Method) = log.info("  + " + behavior.getName)
+        def expected(method: Method) = { 
+          eventHandler.handle(asEvent(getFullName(method.getName), "", Result.Success, None))
+        }
 
         def unexpected(method: Method, e: ExpectationFailedException) {
-          log.error(" - " + behavior.getName + ": " + e.getMessage)
-          log.trace(e)
-          testResult = Result.Failed
+          eventHandler.handle(asEvent(getFullName(method.getName), e.getMessage, Result.Failure, Some(e)))
         }
 
         def error(method: Method, t: Throwable) {
-          log.error(" - " + behavior.getName + ": " + t.getMessage)
-          log.trace(t)
-          testResult = Result.Failed
+          eventHandler.handle(asEvent(getFullName(method.getName), t.toString, Result.Error, Some(t)))
         }
       })
     }
@@ -49,4 +76,3 @@ import _root_.jdave.runner.{ISpecVisitor, Context, Behavior, SpecRunner, IBehavi
     def afterContext(context: Context) {}
   }
 }
-
