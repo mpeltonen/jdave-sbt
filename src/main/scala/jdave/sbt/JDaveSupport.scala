@@ -32,7 +32,7 @@ class JDaveRunner(testLoader: ClassLoader, loggers: Array[Logger]) extends Runne
 
   private def log(name : String, desc : String, result : Result) = {
     result match {
-       case Result.Success => logger.info("%s passed.\n".format(name))
+       case Result.Success => logger.debug("%s passed.\n".format(name))
        case Result.Failure => logger.info("%s failed:\n %s".format(name, desc))
        case Result.Error => logger.info("%s exception occurred\n %s".format(name, desc))
     }
@@ -56,7 +56,6 @@ class JDaveRunner(testLoader: ClassLoader, loggers: Array[Logger]) extends Runne
     
     def onContext(context: Context) = {}
 
-    
     def onBehavior(behavior: Behavior) {
       behavior.run(new IBehaviorResults {
         def expected(method: Method) = { 
