@@ -1,10 +1,7 @@
 Simple support for executing JDave (http://www.jdave.org/) specs written in Scala
-with sbt (http://code.google.com/p/simple-build-tool/). 
+with xsbt (https://github.com/harrah/xsbt). 
 
 1) ./sbt clean package
-2) Copy target/jdave-sbt-<version>.jar into project/build/lib directory
-   of your sbt project (sbt version must be at least 0.4.5).
-3) Override testFrameworks in your project definition to include jdave support:
+2) Add jdave-sbt to testFramework in your project definition to include jdave support:
 
-    override def testFrameworks = sbt.SpecsFramework :: jdave.sbt.JDaveFramework :: Nil
-
+   testFrameworks += new TestFramework("org.jdave.sbt.JDaveFramework")
