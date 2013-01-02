@@ -35,6 +35,7 @@ class JDaveRunner(testLoader: ClassLoader, loggers: Array[Logger]) extends Runne
        case Result.Success => logger.debug("%s passed.\n".format(name))
        case Result.Failure => logger.info("%s failed:\n %s".format(name, desc))
        case Result.Error => logger.info("%s exception occurred\n %s".format(name, desc))
+       case Result.Skipped => logger.debug("%s skipped:\n %s".format(name, desc))
     }
   }
   
